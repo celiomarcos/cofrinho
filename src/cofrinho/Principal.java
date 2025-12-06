@@ -1,44 +1,57 @@
 package cofrinho;
 
+import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
  * Classe principal que executa o sistema do Cofrinho.
- * Fornece um menu interativo para o usuario gerenciar suas moedas.
  * 
- * Na inicializacao, busca cotacoes em tempo real da API AwesomeAPI.
- * 
- * Funcionalidades:
- * - Adicionar moedas (Real, Dolar, Euro)
- * - Remover moedas especificas
- * - Listar todas as moedas
- * - Calcular total convertido para Real
- * - Atualizar cotacoes em tempo real
+ * Recursos:
+ * - Cotacoes em tempo real (API AwesomeAPI)
+ * - Armazenamento na nuvem (API JSONBin.io)
+ * - Sincronizacao automatica ao adicionar/remover moedas
+ * - Persistencia entre execucoes do programa
  * 
  * @author Celio Marcos
  */
 public class Principal {
 
-    // Servico de cotacoes (compartilhado)
+    // Servicos
     private static CotacaoService cotacaoService;
+    private static CloudStorageService cloudService;
+    private static Cofrinho cofrinho;
+    private static Scanner teclado;
 
     public static void main(String[] args) {
         
-        Scanner teclado = new Scanner(System.in);
-        Cofrinho cofrinho = new Cofrinho();
+        teclado = new Scanner(System.in);
+        cofrinho = new Cofrinho();
         int opcao;
         
-        System.out.println("===================================");
-        System.out.println("     BEM-VINDO AO COFRINHO");
-        System.out.println("  Sistema de Gerenciamento de Moedas");
-        System.out.println("===================================");
-        System.out.println();
+        exibirBanner();
         
-        // Inicializa o servico de cotacoes (busca da API)
+        // Inicializa servico de cotacoes
         System.out.println("Carregando cotacoes atualizadas...");
         cotacaoService = new CotacaoService();
         System.out.println();
         
+        // Inicializa servico de nuvem
+        System.out.println("Conectando ao armazenamento em nuvem...");
+        cloudService = new CloudStorageService();
+        
+        // Tenta carregar dados da nuvem
+        if (cloudService.isConfigurado()) {
+            ArrayList<Moeda> moedasNuvem = cloudService.carregarDaNuvem();
+            if (moedasNuvem != null && !moedasNuvem.isEmpty()) {
+                cofrinho.carregarMoedas(moedasNuvem);
+                System.out.println("Cofrinho sincronizado com a nuvem!");
+            }
+        } else {
+            System.out.println("Nuvem nao configurada. Use opcao 8 para configurar.");
+        }
+        System.out.println();
+        
+        // Loop principal
         do {
             exibirMenu();
             
@@ -50,10 +63,10 @@ public class Principal {
             
             switch (opcao) {
                 case 1:
-                    adicionarMoeda(teclado, cofrinho);
+                    adicionarMoeda();
                     break;
                 case 2:
-                    removerMoeda(teclado, cofrinho);
+                    removerMoeda();
                     break;
                 case 3:
                     cofrinho.listagemMoedas();
@@ -67,10 +80,17 @@ public class Principal {
                 case 6:
                     cotacaoService.atualizarCotacoes();
                     break;
+                case 7:
+                    sincronizarNuvem();
+                    break;
+                case 8:
+                    configurarNuvem();
+                    break;
+                case 9:
+                    exibirStatusNuvem();
+                    break;
                 case 0:
-                    System.out.println("\nObrigado por usar o Cofrinho!");
-                    System.out.printf("Voce esta saindo com R$ %.2f em moedas.%n", 
-                                      cofrinho.totalConvertido());
+                    encerrarPrograma();
                     break;
                 default:
                     System.out.println("\nOpcao invalida! Tente novamente.");
@@ -82,23 +102,43 @@ public class Principal {
     }
     
     /**
-     * Exibe o menu principal de opcoes.
+     * Exibe banner inicial do programa.
+     */
+    private static void exibirBanner() {
+        System.out.println("╔════════════════════════════════════════╗");
+        System.out.println("║         BEM-VINDO AO COFRINHO          ║");
+        System.out.println("║    Sistema de Gerenciamento de Moedas  ║");
+        System.out.println("║                                        ║");
+        System.out.println("║  * Cotacoes em tempo real              ║");
+        System.out.println("║  * Sincronizacao com a nuvem           ║");
+        System.out.println("╚════════════════════════════════════════╝");
+        System.out.println();
+    }
+    
+    /**
+     * Exibe o menu principal.
      */
     private static void exibirMenu() {
-        System.out.println("\n---------- MENU ----------");
-        System.out.println("1 - Adicionar moeda");
-        System.out.println("2 - Remover moeda");
-        System.out.println("3 - Listar moedas");
-        System.out.println("4 - Total convertido para Real");
-        System.out.println("5 - Ver cotacoes atuais");
-        System.out.println("6 - Atualizar cotacoes (API)");
-        System.out.println("0 - Sair");
-        System.out.println("--------------------------");
+        String statusNuvem = cloudService.isConectado() ? "[ONLINE]" : 
+                            (cloudService.isConfigurado() ? "[OFFLINE]" : "[NAO CONFIG]");
+        
+        System.out.println("\n╔════════════ MENU " + statusNuvem + " ════════════╗");
+        System.out.println("║  1 - Adicionar moeda                    ║");
+        System.out.println("║  2 - Remover moeda                      ║");
+        System.out.println("║  3 - Listar moedas                      ║");
+        System.out.println("║  4 - Total convertido para Real         ║");
+        System.out.println("║  5 - Ver cotacoes atuais                ║");
+        System.out.println("║  6 - Atualizar cotacoes (API)           ║");
+        System.out.println("║  7 - Sincronizar com nuvem              ║");
+        System.out.println("║  8 - Configurar nuvem (JSONBin.io)      ║");
+        System.out.println("║  9 - Status da nuvem                    ║");
+        System.out.println("║  0 - Sair                               ║");
+        System.out.println("╚═════════════════════════════════════════╝");
         System.out.print("Escolha uma opcao: ");
     }
     
     /**
-     * Exibe as cotacoes atuais do Dolar e Euro.
+     * Exibe as cotacoes atuais.
      */
     private static void exibirCotacoesAtuais() {
         System.out.println("\n----- COTACOES ATUAIS -----");
@@ -114,11 +154,9 @@ public class Principal {
     }
     
     /**
-     * Realiza a adicao de uma nova moeda ao cofrinho.
-     * Demonstra POLIMORFISMO: variavel 'moeda' e do tipo Moeda (abstrato)
-     * mas recebe instancia de uma classe concreta (Real, Dolar ou Euro).
+     * Adiciona uma moeda e sincroniza com a nuvem.
      */
-    private static void adicionarMoeda(Scanner teclado, Cofrinho cofrinho) {
+    private static void adicionarMoeda() {
         int tipoMoeda = 0;
         
         System.out.println("\n--- ADICIONAR MOEDA ---");
@@ -152,32 +190,30 @@ public class Principal {
             return;
         }
         
-        // POLIMORFISMO: moeda pode ser Real, Dolar ou Euro
         Moeda moeda = null;
-        
         switch (tipoMoeda) {
-            case 1:
-                moeda = new Real(valor);
-                break;
-            case 2:
-                moeda = new Dolar(valor);
-                break;
-            case 3:
-                moeda = new Euro(valor);
-                break;
+            case 1: moeda = new Real(valor); break;
+            case 2: moeda = new Dolar(valor); break;
+            case 3: moeda = new Euro(valor); break;
         }
         
         if (moeda != null) {
             cofrinho.adicionar(moeda);
+            
+            // Sincroniza automaticamente com a nuvem
+            if (cloudService.isConfigurado()) {
+                System.out.print("Sincronizando com a nuvem... ");
+                if (cloudService.salvarNaNuvem(cofrinho.getListaMoedas())) {
+                    System.out.println("OK!");
+                }
+            }
         }
     }
     
     /**
-     * Realiza a remocao de uma moeda do cofrinho.
-     * Cria uma moeda temporaria para busca usando equals().
+     * Remove uma moeda e sincroniza com a nuvem.
      */
-    private static void removerMoeda(Scanner teclado, Cofrinho cofrinho) {
-        
+    private static void removerMoeda() {
         if (cofrinho.getQuantidadeMoedas() == 0) {
             System.out.println("\nO cofrinho esta vazio! Nada para remover.");
             return;
@@ -211,23 +247,140 @@ public class Principal {
         }
         double valor = teclado.nextDouble();
         
-        // Cria moeda para busca (sera usada no equals)
         Moeda moeda = null;
-        
         switch (tipoMoeda) {
-            case 1:
-                moeda = new Real(valor);
-                break;
-            case 2:
-                moeda = new Dolar(valor);
-                break;
-            case 3:
-                moeda = new Euro(valor);
-                break;
+            case 1: moeda = new Real(valor); break;
+            case 2: moeda = new Dolar(valor); break;
+            case 3: moeda = new Euro(valor); break;
         }
         
         if (moeda != null) {
-            cofrinho.remover(moeda);
+            boolean removido = cofrinho.remover(moeda);
+            
+            // Sincroniza automaticamente com a nuvem se removeu
+            if (removido && cloudService.isConfigurado()) {
+                System.out.print("Sincronizando com a nuvem... ");
+                if (cloudService.salvarNaNuvem(cofrinho.getListaMoedas())) {
+                    System.out.println("OK!");
+                }
+            }
         }
+    }
+    
+    /**
+     * Forca sincronizacao manual com a nuvem.
+     */
+    private static void sincronizarNuvem() {
+        if (!cloudService.isConfigurado()) {
+            System.out.println("\nNuvem nao configurada! Use opcao 8 primeiro.");
+            return;
+        }
+        
+        System.out.println("\nO que deseja fazer?");
+        System.out.println("1 - Enviar dados locais para a nuvem");
+        System.out.println("2 - Baixar dados da nuvem");
+        System.out.print("Opcao: ");
+        
+        int opcao = teclado.nextInt();
+        
+        if (opcao == 1) {
+            System.out.print("Enviando para a nuvem... ");
+            if (cloudService.salvarNaNuvem(cofrinho.getListaMoedas())) {
+                System.out.println("Sincronizado com sucesso!");
+            }
+        } else if (opcao == 2) {
+            System.out.print("Baixando da nuvem... ");
+            ArrayList<Moeda> moedasNuvem = cloudService.carregarDaNuvem();
+            if (moedasNuvem != null) {
+                cofrinho.carregarMoedas(moedasNuvem);
+                System.out.println("Sincronizado! " + moedasNuvem.size() + " moeda(s) carregadas.");
+            }
+        }
+    }
+    
+    /**
+     * Configura a conexao com JSONBin.io.
+     */
+    private static void configurarNuvem() {
+        System.out.println("\n╔═══════════════════════════════════════════╗");
+        System.out.println("║     CONFIGURACAO DO JSONBIN.IO            ║");
+        System.out.println("╠═══════════════════════════════════════════╣");
+        System.out.println("║ 1. Acesse: https://jsonbin.io             ║");
+        System.out.println("║ 2. Crie uma conta gratuita                ║");
+        System.out.println("║ 3. Va em 'API Keys' no dashboard          ║");
+        System.out.println("║ 4. Copie sua 'X-Master-Key'               ║");
+        System.out.println("╚═══════════════════════════════════════════╝");
+        
+        System.out.println("\nOpcoes:");
+        System.out.println("1 - Inserir nova API Key");
+        System.out.println("2 - Limpar configuracao");
+        System.out.println("0 - Voltar");
+        System.out.print("Opcao: ");
+        
+        int opcao = teclado.nextInt();
+        teclado.nextLine(); // Limpa buffer
+        
+        if (opcao == 1) {
+            System.out.print("\nCole sua API Key (X-Master-Key): ");
+            String apiKey = teclado.nextLine().trim();
+            
+            if (apiKey.isEmpty()) {
+                System.out.println("API Key invalida!");
+                return;
+            }
+            
+            cloudService.configurarApiKey(apiKey);
+            
+            System.out.print("Testando conexao... ");
+            if (cloudService.testarConexao()) {
+                System.out.println("Conectado com sucesso!");
+            } else {
+                System.out.println("Falha na conexao. Verifique a API Key.");
+            }
+            
+        } else if (opcao == 2) {
+            cloudService.limparConfiguracao();
+        }
+    }
+    
+    /**
+     * Exibe status detalhado da conexao com a nuvem.
+     */
+    private static void exibirStatusNuvem() {
+        System.out.println("\n----- STATUS DA NUVEM -----");
+        System.out.println("Servico: JSONBin.io");
+        System.out.println("Configurado: " + (cloudService.isConfigurado() ? "Sim" : "Nao"));
+        System.out.println("Conectado: " + (cloudService.isConectado() ? "Sim" : "Nao"));
+        
+        if (cloudService.getBinId() != null) {
+            System.out.println("Bin ID: " + cloudService.getBinId());
+        }
+        
+        System.out.println("Moedas locais: " + cofrinho.getQuantidadeMoedas());
+        System.out.println("---------------------------");
+    }
+    
+    /**
+     * Encerra o programa salvando na nuvem.
+     */
+    private static void encerrarPrograma() {
+        System.out.println();
+        
+        // Salva na nuvem antes de sair
+        if (cloudService.isConfigurado() && cofrinho.getQuantidadeMoedas() > 0) {
+            System.out.print("Salvando na nuvem antes de sair... ");
+            if (cloudService.salvarNaNuvem(cofrinho.getListaMoedas())) {
+                System.out.println("OK!");
+            }
+        }
+        
+        System.out.println("\nObrigado por usar o Cofrinho!");
+        System.out.printf("Voce possui R$ %.2f em moedas.%n", cofrinho.totalConvertido());
+        
+        if (cloudService.isConfigurado()) {
+            System.out.println("Seus dados estao salvos na nuvem!");
+        }
+        
+        System.out.println("Ate a proxima!");
     }
 }

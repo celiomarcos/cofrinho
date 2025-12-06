@@ -133,4 +133,20 @@ public class Cofrinho {
     public int getQuantidadeMoedas() {
         return listaMoedas.size();
     }
+    
+    /**
+     * Retorna a lista de moedas (para sincronizacao com nuvem).
+     * @return ArrayList de moedas
+     */
+    public ArrayList<Moeda> getListaMoedas() {
+        return listaMoedas;
+    }
+    
+    /**
+     * Carrega moedas de uma lista externa (da nuvem).
+     * @param moedas Lista de moedas para carregar
+     */
+    public void carregarMoedas(ArrayList<Moeda> moedas) {
+        this.listaMoedas = moedas;
+    }
 }
